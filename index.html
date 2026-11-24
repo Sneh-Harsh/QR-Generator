@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>QR Code Generator</title>
+  <meta name="description" content="Paste a link and download a QR code instantly.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Caveat:wght@600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #e4e9f1;
+      --text: #2d3748;
+      --muted: #7a869a;
+      --accent: #5b6cf0;
+      --accent-2: #8a5bf0;
+      --hi: #ffffff;
+      --lo: #b7c0d0;
+      --error: #d64550;
+      --dot: 91, 108, 240;      /* rgb of background squares */
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #23262e;
+        --text: #e6e9ef;
+        --muted: #8b93a3;
+        --accent: #7b88ff;
+        --accent-2: #a98bff;
+        --hi: #2d313b;
+        --lo: #181a20;
+        --error: #ff7a85;
+        --dot: 123, 136, 255;
+      }
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+      display: grid;
+      place-items: center;
+      padding: 24px 16px;
+      overflow-x: hidden;
+    }
+
+    /* Interactive background */
+    #bg { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+
+    .card {
+      position: relative; z-index: 1;
+      width: 100%;
+      max-width: 920px;
+      padding: 40px 36px 28px;
+      border-radius: 36px;
+      background: var(--bg);
+      box-shadow: 16px 16px 34px var(--lo), -16px -16px 34px var(--hi);
+      animation: cardIn .8s cubic-bezier(.2,.8,.2,1) both;
+    }
+    @keyframes cardIn { from { opacity: 0; transform: translateY(30px) scale(.97); } to { opacity: 1; transform: none; } }
+
+    header { text-align: center; margin-bottom: 30px; }
+    .logo {
+      width: 64px; height: 64px;
+      margin: 0 auto 16px;
+      border-radius: 20px;
+      display: grid; place-items: center;
+      background: var(--bg);
+      box-shadow: 6px 6px 12px var(--lo), -6px -6px 12px var(--hi);
+      animation: float 4s ease-in-out infinite;
+    }
+    @keyframes float { 50% { transform: translateY(-6px); } }
+    .logo svg { width: 30px; height: 30px; }
+    h1 { margin: 0 0 8px; font-size: 1.8rem; font-weight: 700; letter-spacing: -0.02em; }
+    .sub { margin: 0; color: var(--muted); font-size: .95rem; }
+
+    /* Two columns: input left, QR right */
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; align-items: stretch; }
+    .left, .right { animation: cardIn .8s .15s cubic-bezier(.2,.8,.2,1) both; }
+    .right { animation-delay: .3s; }
+
+    .left { display: flex; flex-direction: column; justify-content: center; }
+    label.title { display: block; text-align: left; margin: 0 0 12px 6px; font-size: .85rem; font-weight: 600; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
+    form { display: flex; flex-direction: column; gap: 20px; }
+
+    .field {
+      display: block;
+      border-radius: 18px;
+      background: var(--bg);
+      box-shadow: inset 6px 6px 12px var(--lo), inset -6px -6px 12px var(--hi);
+      padding: 4px 18px;
+      transition: box-shadow .25s;
+    }
+    .field:focus-within {
+      box-shadow: inset 6px 6px 12px var(--lo), inset -6px -6px 12px var(--hi), 0 0 0 2px var(--accent), 0 0 22px rgba(var(--dot), .35);
+    }
+    input {
+      width: 100%; border: 0; outline: 0;
+      background: transparent; color: var(--text);
+      font: inherit; font-size: 1rem; padding: 15px 0;
+    }
+    input::placeholder { color: var(--muted); opacity: .8; }
+
+    .btn {
+      position: relative; overflow: hidden;
+      border: 0; cursor: pointer;
+      font: inherit; font-weight: 600; font-size: 1rem;
+      padding: 15px 22px;
+      border-radius: 18px;
+      color: var(--text);
+      background: var(--bg);
+      box-shadow: 7px 7px 14px var(--lo), -7px -7px 14px var(--hi);
+      transition: box-shadow .15s, transform .2s;
+    }
+    .btn:hover { transform: translateY(-2px); }
+    .btn:active { transform: translateY(0); box-shadow: inset 5px 5px 10px var(--lo), inset -5px -5px 10px var(--hi); }
+    .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+    .btn.primary { color: #fff; background: linear-gradient(135deg, var(--accent), var(--accent-2)); background-size: 160% 160%; }
+    .btn.primary:hover { animation: shift 1.2s ease infinite alternate; }
+    @keyframes shift { from { background-position: 0 0; } to { background-position: 100% 100%; } }
+    .btn.primary:active { box-shadow: inset 4px 4px 10px rgba(0,0,0,.25), inset -3px -3px 8px rgba(255,255,255,.15); }
+    .ripple { position: absolute; border-radius: 50%; background: rgba(255,255,255,.45); transform: scale(0); animation: ripple .6s ease-out forwards; pointer-events: none; }
+    @keyframes ripple { to { transform: scale(4); opacity: 0; } }
+
+    #error { min-height: 1.3em; margin-top: 14px; text-align: left; color: var(--error); font-size: .9rem; }
+    #error.shake { animation: shake .4s; }
+    @keyframes shake { 20%,60% { transform: translateX(-6px); } 40%,80% { transform: translateX(6px); } }
+
+    /* Right panel */
+    .right { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 340px; }
+    .qr-wrap {
+      position: relative;
+      width: 100%; max-width: 300px; aspect-ratio: 1;
+      padding: 20px;
+      border-radius: 28px;
+      background: var(--bg);
+      box-shadow: inset 8px 8px 16px var(--lo), inset -8px -8px 16px var(--hi);
+      display: grid; place-items: center;
+    }
+    .placeholder { text-align: center; color: var(--muted); font-size: .9rem; padding: 12px; }
+    .placeholder svg { width: 64px; height: 64px; margin-bottom: 10px; opacity: .55; animation: pulse 2.4s ease-in-out infinite; }
+    @keyframes pulse { 50% { transform: scale(1.1); opacity: .9; } }
+
+    canvas { display: none; width: 100%; height: 100%; border-radius: 14px; background: #fff; }
+    .qr-wrap.ready canvas { display: block; animation: pop .6s cubic-bezier(.2,1.2,.3,1) both; }
+    .qr-wrap.ready .placeholder { display: none; }
+    @keyframes pop { from { opacity: 0; transform: scale(.6) rotate(-6deg); } to { opacity: 1; transform: none; } }
+
+    /* scanning line sweep when a code is generated */
+    .scan { position: absolute; left: 20px; right: 20px; top: 20px; height: 3px; border-radius: 3px; opacity: 0; pointer-events: none;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent); box-shadow: 0 0 14px var(--accent); }
+    .qr-wrap.scanning .scan { animation: scan .9s ease-in-out; }
+    @keyframes scan { 0% { opacity: 1; top: 20px; } 100% { opacity: 0; top: calc(100% - 23px); } }
+
+    #download { display: none; margin-top: 22px; width: 100%; max-width: 300px; }
+    #download.show { display: block; animation: cardIn .5s .35s both; }
+
+    .signature {
+      margin-top: 30px; text-align: center;
+      font-family: "Caveat", "Segoe Script", "Brush Script MT", cursive;
+      font-size: 1.7rem; line-height: 1; user-select: none;
+    }
+    .signature span { background: linear-gradient(135deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .signature small { display: block; margin-bottom: 4px; color: var(--muted); font-family: "Inter", system-ui, sans-serif; font-size: .7rem; letter-spacing: .14em; text-transform: uppercase; }
+
+    @media (max-width: 760px) {
+      .card { padding: 30px 20px 24px; border-radius: 28px; }
+      .grid { grid-template-columns: 1fr; gap: 28px; }
+      .right { min-height: 0; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="bg" aria-hidden="true"></canvas>
+
+  <main class="card">
+    <header>
+      <div class="logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="url(#g)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5b6cf0"/><stop offset="1" stop-color="#8a5bf0"/></linearGradient></defs>
+          <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/>
+          <path d="M14 14h3v3M21 14v.01M14 21h3M21 17v4"/>
+        </svg>
+      </div>
+      <h1>QR Code Generator</h1>
+      <p class="sub">Paste any link and get a QR code you can download in one click.</p>
+    </header>
+
+    <div class="grid">
+      <section class="left">
+        <form id="form">
+          <div>
+            <label class="title" for="link">Your link</label>
+            <div class="field">
+              <input id="link" type="text" placeholder="https://example.com" autocomplete="off" required>
+            </div>
+          </div>
+          <button class="btn primary" type="submit">Generate QR</button>
+        </form>
+        <div id="error" role="alert"></div>
+      </section>
+
+      <section class="right">
+        <div class="qr-wrap" id="wrap">
+          <div class="placeholder">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/>
+              <path d="M14 14h3v3M21 14v.01M14 21h3M21 17v4"/>
+            </svg>
+            <div>Your QR code will appear here</div>
+          </div>
+          <canvas id="canvas" aria-label="Generated QR code"></canvas>
+          <div class="scan"></div>
+        </div>
+        <button id="download" class="btn" type="button">Download PNG</button>
+      </section>
+    </div>
+
+    <div class="signature"><small>Crafted by</small><span>Sneh Harsh</span></div>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+  <script>
+    qrcode.stringToBytes = qrcode.stringToBytesFuncs["UTF-8"];
+
+    const form = document.getElementById("form");
+    const input = document.getElementById("link");
+    const canvas = document.getElementById("canvas");
+    const wrap = document.getElementById("wrap");
+    const dlBtn = document.getElementById("download");
+    const error = document.getElementById("error");
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      error.textContent = "";
+      let link = input.value.trim();
+      if (!link) return;
+      if (!/^[a-z][a-z0-9+.-]*:/i.test(link)) link = "https://" + link; // "example.com" -> https://example.com
+      try {
+        drawQR(link);
+        // restart the pop-in and scan animations on every generation
+        wrap.classList.remove("ready", "scanning");
+        void wrap.offsetWidth;
+        wrap.classList.add("ready", "scanning");
+        dlBtn.classList.remove("show"); void dlBtn.offsetWidth; dlBtn.classList.add("show");
+      } catch (err) {
+        console.error(err);
+        wrap.classList.remove("ready");
+        dlBtn.classList.remove("show");
+        error.textContent = /overflow/i.test(String(err))
+          ? "That link is too long to encode. Try a shorter one."
+          : "Something went wrong generating the QR code. Please reload and try again.";
+        error.classList.remove("shake"); void error.offsetWidth; error.classList.add("shake");
+      }
+    });
+
+    function drawQR(text) {
+      const qr = qrcode(0, "M");
+      qr.addData(text);
+      qr.make();
+      const count = qr.getModuleCount();
+      const margin = 2, cell = Math.ceil(520 / (count + margin * 2)); // high-res for crisp download
+      const size = (count + margin * 2) * cell;
+      canvas.width = canvas.height = size;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, size, size);
+      ctx.fillStyle = "#000";
+      for (let r = 0; r < count; r++)
+        for (let c = 0; c < count; c++)
+          if (qr.isDark(r, c)) ctx.fillRect((c + margin) * cell, (r + margin) * cell, cell, cell);
+    }
+
+    dlBtn.addEventListener("click", () => {
+      const a = document.createElement("a");
+      a.href = canvas.toDataURL("image/png");
+      a.download = "qr-code.png";
+      a.click();
+    });
+
+    // Button ripple
+    document.querySelectorAll(".btn").forEach((b) => b.addEventListener("pointerdown", (e) => {
+      const r = b.getBoundingClientRect(), d = Math.max(r.width, r.height) / 2;
+      const s = document.createElement("span");
+      s.className = "ripple";
+      s.style.cssText = `width:${d}px;height:${d}px;left:${e.clientX - r.left - d / 2}px;top:${e.clientY - r.top - d / 2}px`;
+      b.appendChild(s);
+      setTimeout(() => s.remove(), 600);
+    }));
+
+    // Interactive background: a grid of squares that swell and glow near the pointer
+    (() => {
+      const cv = document.getElementById("bg"), ctx = cv.getContext("2d");
+      const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const GAP = 34, RADIUS = 170;
+      let w, h, dpr, cols, rows, mx = -9999, my = -9999, tx = -9999, ty = -9999;
+
+      function resize() {
+        dpr = Math.min(devicePixelRatio || 1, 2);
+        w = innerWidth; h = innerHeight;
+        cv.width = w * dpr; cv.height = h * dpr;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        cols = Math.ceil(w / GAP) + 1; rows = Math.ceil(h / GAP) + 1;
+      }
+      addEventListener("resize", resize); resize();
+      addEventListener("pointermove", (e) => { tx = e.clientX; ty = e.clientY; });
+      addEventListener("pointerleave", () => { tx = ty = -9999; });
+
+      const rgb = () => getComputedStyle(document.documentElement).getPropertyValue("--dot").trim();
+      function frame(t) {
+        mx += (tx - mx) * .15; my += (ty - my) * .15; // smooth follow
+        ctx.clearRect(0, 0, w, h);
+        const col = rgb();
+        for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) {
+          const x = i * GAP, y = j * GAP;
+          const wave = (Math.sin(t / 900 + i * .5 + j * .35) + 1) / 2;       // slow drifting wave
+          const d = Math.hypot(x - mx, y - my);
+          const near = Math.max(0, 1 - d / RADIUS);                          // 0..1 near the pointer
+          const size = 3 + wave * 2 + near * 12;
+          const alpha = .08 + wave * .06 + near * .55;
+          ctx.fillStyle = `rgba(${col},${alpha})`;
+          const r = size / 2;
+          ctx.beginPath(); ctx.roundRect(x - r, y - r, size, size, size * .25); ctx.fill();
+        }
+        if (!still) requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+    })();
+  </script>
+</body>
+</html>
